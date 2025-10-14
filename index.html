@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Advanced Timetable</title>
+    <style>
+        /* Body background with animated gradient + blur shapes */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(135deg, #74ebd5, #9face6);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.5;
+            z-index: 0;
+        }
+        body::before {
+            width: 400px;
+            height: 400px;
+            background: #ff9a9e;
+            top: -100px;
+            left: -100px;
+        }
+        body::after {
+            width: 500px;
+            height: 500px;
+            background: #fad0c4;
+            bottom: -150px;
+            right: -150px;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+        h1 {
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        #dynamicTitle {
+            color: #333;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+
+        /* Glassmorphism buttons and inputs */
+        button, select, input {
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            margin: 5px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #111; 
+            background: rgba(255, 255, 255, 0.5);
+        }
+        button {
+            background: rgba(255, 255, 255, 0.25);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        #save, .modal button:last-of-type {
+            color: #111 !important; 
+        }
+        
+        /* Print Controls Container */
+        #printControls {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+            /* HIDDEN BY DEFAULT */
+            display: none; 
+        }
+        #printControls.visible {
+            display: grid;
+        }
+        #printControls h3 {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin: 0 0 5px 0;
+        }
+        /* Style for View Type and Print Button spanning full width */
+        #printControls > div:first-child,
+        #printControls button {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 5px 0;
+        }
+        #printControls button {
+             margin-top: 10px;
+        }
+        #printControls label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 3px;
+        }
+        #printControls #printViewType {
+            width: 150px; 
+            margin-left: 10px;
+        }
+        
+        /* Individual selector containers - span one column */
+        #printControls > div:not(:first-child):not(:last-child) {
+            padding: 0 5px;
+        }
+        /* Make select elements fill their grid column */
+        #printControls select:not(#printViewType) {
+            width: 100%;
+        }
+        
+        /* Toggle button styling */
+        #togglePrintBtn {
+            display: block;
+            width: fit-content;
+            margin: 20px auto 0;
+        }
+
+
+        /* Timetable container glass look */
+        .grid {
+            display: grid;
+            grid-template-columns: 80px repeat(5, 1fr);
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            overflow: hidden;
+        }
+
+        .cell {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px;
+            text-align: center;
+            font-size: 14px;
+            color: #111;
+            background: rgba(255, 255, 255, 0.4);
+            transition: background 0.3s ease;
+        }
+        .cell:hover {
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        .header {
+            background: rgba(37, 99, 235, 0.7);
+            color: white;
+            font-weight: bold;
+        }
+
+        .class-box {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 10px;
+            padding: 6px;
+            margin: 2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            position: relative;
+            font-size: 13px;
+        }
+
+        /* Icon buttons */
+        .icon-btn {
+            position: absolute;
+            top: 0px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            width: 16px;
+            height: 16px;
+            backdrop-filter: none; 
+            box-shadow: none;
+            transition: none;
+        }
+        .icon-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: white;
+            pointer-events: none;
+        }
+        .edit { right: 20px; background: orange; }
+        .del { right: 1px; background: red; }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .modal .sheet {
+            background: rgba(255,255,255,0.8);
+            border-radius: 15px;
+            padding: 40px;
+            width: 320px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .modal .sheet h3 {
+            margin-top: 0;
+            text-align: center;
+            color: #333;
+        }
+        .modal input, .modal select {
+            width: 100%;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+
+        /* --- Print-Specific Styles --- */
+        .print-view-container {
+            display: none; 
+        }
+        
+        .print-timetable-wrapper {
+            margin: 5px 0; 
+            page-break-inside: avoid; 
+        }
+        
+        .print-timetable-wrapper .grid {
+            margin-top: 2px; 
+            box-shadow: none; 
+            border: 1px solid #aaa;
+            background: #fff; 
+        }
+        .print-timetable-wrapper h2 {
+            text-align: center;
+            margin: 5px 0 0 0; 
+            color: #1f2937;
+            page-break-after: avoid; 
+        }
+        
+        @media print {
+            @page {
+                size: A4 portrait; 
+                margin: 10mm; 
+            }
+
+            /* Hide non-essential elements on print */
+            h1, 
+            .container > div:first-child,
+            #printControls,
+            #togglePrintBtn,
+            .icon-btn,
+            .modal,
+            #dynamicTitle { 
+                display: none !important;
+            }
+
+            /* Show the print view container and set print CSS grid */
+            .print-view-container {
+                display: grid !important;
+                grid-template-rows: auto; 
+                width: 100%;
+                max-width: none;
+                padding: 0;
+            }
+            
+            /* Default: Vertical layout (1 column) */
+            .print-view-container {
+                grid-template-columns: 1fr; 
+                gap: 0; 
+            }
+            
+            /* Horizontal (2-Column) Teacher Layout */
+            #printViewContainer[data-layout="horizontal-teacher"] {
+                grid-template-columns: 1fr 1fr !important; 
+                gap: 5px; 
+            }
+            #printViewContainer[data-layout="horizontal-teacher"] .print-timetable-wrapper {
+                margin: 5px;
+            }
+
+            /* Vertical (1-Column) Student/Teacher Layouts (stacked) */
+            #printViewContainer[data-layout="vertical-teacher"],
+            #printViewContainer[data-layout="vertical-student"] {
+                grid-template-columns: 1fr !important;
+                gap: 0;
+            }
+
+            /* Ensure the main grid is hidden in print mode */
+            .container > .grid {
+                display: none !important;
+            }
+
+            /* Adjust body for printing */
+            body {
+                background: none !important;
+                animation: none !important;
+                min-height: auto !important;
+                display: block !important;
+                padding: 0;
+                margin: 0; 
+            }
+            body::before, body::after {
+                content: none !important;
+            }
+
+            /* Print Styling Adjustments (font sizes change based on layout) */
+            
+            /* Smaller text/padding for 2-column printout (Teacher Horizontal) */
+            #printViewContainer[data-layout="horizontal-teacher"] .print-timetable-wrapper .cell {
+                font-size: 8px; 
+                padding: 2px;
+            }
+            #printViewContainer[data-layout="horizontal-teacher"] .print-timetable-wrapper .class-box {
+                font-size: 7px;
+                padding: 2px;
+            }
+            
+            /* Standard size for 1-column printout (Teacher Vertical/Student Vertical - 4 or 5 tables) */
+            #printViewContainer[data-layout="vertical-teacher"] .print-timetable-wrapper .cell,
+            #printViewContainer[data-layout="vertical-student"] .print-timetable-wrapper .cell {
+                padding: 4px; 
+                font-size: 11px; 
+                background: #f7f7f7 !important; 
+                color: #000;
+                border: 1px solid #ccc;
+            }
+            #printViewContainer[data-layout="vertical-teacher"] .print-timetable-wrapper .class-box,
+            #printViewContainer[data-layout="vertical-student"] .print-timetable-wrapper .class-box {
+                padding: 3px;
+                border-radius: 3px;
+                font-size: 10px; 
+                box-shadow: none;
+                background: #fff !important;
+                border: 1px solid #ddd;
+            }
+            
+            /* Sizing for exactly 3 tables to fit vertically on one A4 page */
+            #printViewContainer[data-job-count="3"] .print-timetable-wrapper {
+                margin: 2px 0; 
+            }
+            #printViewContainer[data-job-count="3"] .print-timetable-wrapper h2 {
+                margin: 3px 0 2px 0; 
+                font-size: 14px;
+            }
+            #printViewContainer[data-job-count="3"] .print-timetable-wrapper .cell {
+                padding: 2px; 
+                font-size: 9px;
+            }
+            #printViewContainer[data-job-count="3"] .print-timetable-wrapper .class-box {
+                padding: 1px;
+                font-size: 8px; 
+            }
+
+
+            /* General print styles (apply to both) */
+            .print-timetable-wrapper .grid {
+                border-radius: 0;
+                border: 1px solid #333;
+            }
+            .print-timetable-wrapper .header {
+                background: #4a90e2 !important;
+                color: white !important;
+                padding: 5px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Advanced Timetable Schedule</h1>
+    <div>
+        <label>View:</label>
+        <select id="viewSelect">
+            <option value="teacher">Teacher</option>
+            <option value="student">Student</option>
+        </select>
+        <label id="personLabel">Teacher:</label>
+        <select id="personSelect"></select>
+        <button id="addPerson">+ Add</button>
+        <button id="addClass">+ Add Class</button>
+    </div>
+    
+    <div id="dynamicTitle"></div>
+
+    <button id="togglePrintBtn">🔽 Show Print Options</button>
+    
+    <div id="printControls">
+        <h3>Print Timetables</h3>
+        
+        <div>
+            <label for="printViewType">Print View:</label>
+            <select id="printViewType">
+                <option value="teacher">Teachers </option>
+                <option value="student">Students </option>
+            </select>
+        </div>
+
+        <div>
+            <label>Person 1:</label>
+            <select id="printPerson1"></select>
+        </div>
+        <div>
+            <label>Person 2:</label>
+            <select id="printPerson2"></select>
+        </div>
+        <div>
+            <label>Person 3:</label>
+            <select id="printPerson3"></select>
+        </div>
+        <div>
+            <label>Person 4:</label>
+            <select id="printPerson4"></select>
+        </div>
+        <div id="person5Container">
+            <label>Person 5:</label>
+            <select id="printPerson5"></select>
+        </div>
+        <div id="person6Container">
+            <label>Person 6:</label>
+            <select id="printPerson6"></select>
+        </div>
+
+        <button id="printBtn">🖨️ Print Timetables</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+</div>
+
+<div class="print-view-container" id="printViewContainer">
+    </div>
+
+<div class="modal" id="modal">
+    <div class="sheet">
+        <h3 id="modalTitle">Add Class</h3>
+        <input type="hidden" id="editId">
+        <input id="subject" placeholder="Subject"><br>
+        <input id="students" placeholder="Students (comma separated)"><br>
+        <select id="day">
+            <option>Monday</option><option>Tuesday</option>
+            <option>Wednesday</option><option>Thursday</option><option>Friday</option>
+        </select>
+        <input type="time" id="start"> <input type="time" id="end"><br>
+        <button id="save">Save</button>
+        <button onclick="modal.style.display='none'">Cancel</button>
+    </div>
+</div>
+
+<script>
+const API = "http://localhost:5000/api";
+let currentView = "teacher", currentPerson = null;
+
+// DOM Elements for Main View
+const grid = document.getElementById("grid");
+const viewSelect = document.getElementById("viewSelect");
+const personLabel = document.getElementById("personLabel");
+const personSelect = document.getElementById("personSelect");
+const addPerson = document.getElementById("addPerson");
+const addClass = document.getElementById("addClass");
+const dynamicTitle = document.getElementById("dynamicTitle"); 
+
+// DOM Elements for Modal
+const modal = document.getElementById("modal");
+const modalTitle = document.getElementById("modalTitle");
+const editId = document.getElementById("editId");
+const subject = document.getElementById("subject");
+const students = document.getElementById("students");
+const day = document.getElementById("day");
+const start = document.getElementById("start");
+const end = document.getElementById("end");
+const save = document.getElementById("save");
+
+// DOM Elements for Print View 
+const togglePrintBtn = document.getElementById("togglePrintBtn"); 
+const printControls = document.getElementById("printControls"); 
+const printViewType = document.getElementById("printViewType"); 
+const printPerson1 = document.getElementById("printPerson1");
+const printPerson2 = document.getElementById("printPerson2");
+const printPerson3 = document.getElementById("printPerson3");
+const printPerson4 = document.getElementById("printPerson4");
+const printPerson5 = document.getElementById("printPerson5");
+const printPerson6 = document.getElementById("printPerson6"); // NEW
+const person5Container = document.getElementById("person5Container");
+const person6Container = document.getElementById("person6Container"); // NEW
+const printBtn = document.getElementById("printBtn");
+const printViewContainer = document.getElementById("printViewContainer");
+
+// Global data store
+let allTeachers = [];
+let allStudents = [];
+
+
+// --- Print Controls Toggle Logic ---
+togglePrintBtn.onclick = () => {
+    const isVisible = printControls.classList.toggle('visible');
+    if (isVisible) {
+        togglePrintBtn.innerHTML = '🔼 Hide Print Options';
+    } else {
+        togglePrintBtn.innerHTML = '🔽 Show Print Options';
+    }
+}
+
+// --- Main View Logic ---
+viewSelect.onchange = () => {
+    currentView = viewSelect.value;
+    personLabel.textContent = currentView === "teacher" ? "Teacher:" : "Student:";
+    loadPeople();
+};
+personSelect.onchange = () => {
+    currentPerson = personSelect.value;
+    loadGrid();
+};
+
+addPerson.onclick = async () => {
+    const name = prompt("Enter " + (currentView === "teacher" ? "teacher" : "student") + " name");
+    if (!name) return;
+    await fetch(API + "/" + (currentView === "teacher" ? "teachers" : "students"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    loadPeople();
+};
+
+addClass.onclick = () => { openModal(); };
+
+function openModal(c) {
+    modal.style.display = "flex";
+    if (c) {
+        modalTitle.textContent = "Edit Class";
+        editId.value = c.id;
+        subject.value = c.subject;
+        students.value = c.students || "";
+        day.value = c.day;
+        start.value = c.start_time;
+        end.value = c.end_time;
+    } else {
+        modalTitle.textContent = "Add Class";
+        editId.value = "";
+        subject.value = ""; students.value = ""; day.value = ""; start.value = ""; end.value = "";
+    }
+}
+
+save.onclick = async () => {
+    const data = { subject: subject.value, day: day.value, start_time: start.value, end_time: end.value };
+    if (currentView === "teacher") data.teacher_id = currentPerson;
+    let studs = students.value.split(",").map(s => s.trim()).filter(Boolean);
+    data.students = studs;
+
+    let res;
+    if (editId.value) {
+        res = await fetch(API + "/classes/" + editId.value, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    } else {
+        res = await fetch(API + "/classes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    }
+
+    if (res.status === 409) { alert("Clash detected! Please check the schedule."); return; }
+    if (res.status !== 200 && res.status !== 201) { alert("An error occurred saving the class."); return; }
+    
+    modal.style.display = "none";
+    loadPeople(); 
+};
+
+// --- Data Loading and Select Population ---
+
+async function loadPeople() {
+    const [resT, resS] = await Promise.all([
+        fetch(API + "/teachers"),
+        fetch(API + "/students")
+    ]);
+    allTeachers = await resT.json();
+    allStudents = await resS.json();
+
+    // Helper function for populating dropdowns
+    const populateSelect = (selectEl, list, currentId) => {
+        selectEl.innerHTML = "";
+        if(list.length === 0) {
+             let o = document.createElement("option"); o.textContent = "No People"; o.value = ""; selectEl.appendChild(o);
+        }
+        list.forEach(p => {
+            let o = document.createElement("option");
+            o.value = p.id;
+            o.textContent = p.name;
+            selectEl.appendChild(o);
+        });
+        if (list.length && currentId !== null) selectEl.value = currentId;
+    }
+
+    // 1. Populate the main view selector
+    const listToUse = currentView === "teacher" ? allTeachers : allStudents;
+    personSelect.innerHTML = "";
+    populateSelect(personSelect, listToUse, currentPerson);
+
+    if (listToUse.length) {
+        currentPerson = personSelect.value; 
+        loadGrid();
+    } else {
+        currentPerson = null;
+        grid.innerHTML = "<div class='cell header' style='grid-column: 1 / -1;'>No " + currentView + " selected. Add one to begin!</div>";
+        dynamicTitle.textContent = "Select or Add a " + (currentView === "teacher" ? "Teacher" : "Student");
+    }
+    
+    // 2. Populate and adjust print controls
+    updatePrintControls();
+}
+
+async function loadGrid() {
+    grid.innerHTML = "";
+    
+    if (!currentPerson) {
+        dynamicTitle.textContent = "Select or Add a " + (currentView === "teacher" ? "Teacher" : "Student");
+        return;
+    }
+
+    // Set the dynamic title using the selected person's name
+    const selectedPersonName = personSelect.options[personSelect.selectedIndex].textContent;
+    dynamicTitle.textContent = `${selectedPersonName}'s ${currentView === 'teacher' ? 'Teaching' : 'Class'} Schedule`;
+    
+    grid.appendChild(cell("Time", "header"));
+    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].forEach(d => grid.appendChild(cell(d, "header")));
+
+    const res = await fetch(API + "/" + (currentView === "teacher" ? "teachers" : "students") + "/" + currentPerson + "/timetable");
+    const classes = await res.json();
+
+    for (let h = 8; h <= 17; h++) {
+        grid.appendChild(cell(h + ":00", "cell"));
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].forEach(d => {
+            const c = document.createElement("div");
+            c.className = "cell";
+            classes.forEach(cl => {
+                if (cl.day === d && parseInt(cl.start_time.split(":")[0]) === h) {
+                    const box = document.createElement("div");
+                    box.className = "class-box";
+                    box.innerHTML = `<b>${cl.subject}</b><br>${currentView === "teacher" ? "Students: " + cl.students : "Teacher: " + cl.teacher}<br>${cl.start_time}-${cl.end_time}`;
+
+                    const e = document.createElement("button");
+                    e.className = "icon-btn edit";
+                    e.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75l11-11.03-3.75-3.75L3 17.25zM21.41 6.34a1.25 1.25 0 0 0 0-1.77l-2.99-2.99a1.25 1.25 0 0 0-1.77 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>';
+                    e.onclick = () => openModal(cl);
+
+                    const del = document.createElement("button");
+                    del.className = "icon-btn del";
+                    del.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"/></svg>';
+                    del.onclick = async () => { if (confirm("Are you sure you want to delete this class?")) { await fetch(API + "/classes/" + cl.id, { method: "DELETE" }); loadGrid(); } }
+                    
+                    box.appendChild(e);
+                    box.appendChild(del);
+                    c.appendChild(box);
+                }
+            });
+            grid.appendChild(c);
+        });
+    }
+}
+
+function cell(t, cls) {
+    let d = document.createElement("div");
+    d.className = "cell " + cls;
+    d.textContent = t;
+    return d;
+}
+
+
+// --- Print Feature Logic ---
+
+// Expanded print selectors array to include printPerson6
+const printSelectors = [
+    { id: 'printPerson1', el: printPerson1, label: document.querySelector('#printPerson1').previousElementSibling },
+    { id: 'printPerson2', el: printPerson2, label: document.querySelector('#printPerson2').previousElementSibling },
+    { id: 'printPerson3', el: printPerson3, label: document.querySelector('#printPerson3').previousElementSibling },
+    { id: 'printPerson4', el: printPerson4, label: document.querySelector('#printPerson4').previousElementSibling },
+    { id: 'printPerson5', el: printPerson5, label: document.querySelector('#printPerson5').previousElementSibling },
+    { id: 'printPerson6', el: printPerson6, label: document.querySelector('#printPerson6').previousElementSibling }, // NEW
+];
+
+function updatePrintControls() {
+    const type = printViewType.value;
+    const list = type === 'teacher' ? allTeachers : allStudents;
+    const labelText = type === 'teacher' ? 'Teacher' : 'Student';
+
+    // 1. Update all selector labels and options
+    printSelectors.forEach((selector, index) => {
+        const el = selector.el;
+        const label = selector.label;
+        
+        // Update label text
+        label.textContent = `${labelText} ${index + 1}:`;
+        
+        // Populate options
+        el.innerHTML = "";
+        const defaultOption = document.createElement("option");
+        defaultOption.textContent = "Select " + labelText;
+        defaultOption.value = "";
+        el.appendChild(defaultOption);
+
+        list.forEach(p => {
+            let o = document.createElement("option");
+            o.value = p.id;
+            o.textContent = p.name;
+            el.appendChild(o);
+        });
+
+        // Hide Person 5 and 6 for Teacher view (to stick to 4 max)
+        const isHidden = type === 'teacher';
+        if (selector.id === 'printPerson5') {
+            person5Container.style.display = isHidden ? 'none' : 'block';
+        }
+        if (selector.id === 'printPerson6') { // NEW check for Person 6
+            person6Container.style.display = isHidden ? 'none' : 'block';
+        }
+    });
+
+    // 2. Update button text
+    if (type === 'teacher') {
+        printBtn.textContent = '🖨️ Print Timetables (2 Tables/Row)';
+    } else {
+        printBtn.textContent = '🖨️ Print Timetables (Vertical Stack)';
+    }
+}
+
+printViewType.onchange = updatePrintControls;
+
+async function generateGridHTML(personId, personType, personName) {
+    if (!personId || personName.startsWith("Select ")) return null;
+
+    const res = await fetch(`${API}/${personType}s/${personId}/timetable`);
+    const classes = await res.json();
+    const title = personType === 'teacher' ? 'Teaching Schedule' : 'Class Schedule';
+
+    // The entire title and grid is wrapped in a dedicated div for page-break control
+    let html = `<div class="print-timetable-wrapper">`;
+    
+    // Title at the top of the print table
+    html += `<h2>${personName}'s ${title}</h2>`;
+    
+    html += '<div class="grid">';
+
+    // Headers
+    html += cell("Time", "header").outerHTML;
+    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].forEach(d => {
+        html += cell(d, "header").outerHTML;
+    });
+
+    // Body
+    for (let h = 8; h <= 17; h++) {
+        html += cell(h + ":00", "cell").outerHTML;
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].forEach(d => {
+            let content = '';
+            classes.forEach(cl => {
+                if (cl.day === d && parseInt(cl.start_time.split(":")[0]) === h) {
+                    const label = personType === "teacher" ? "Students: " + cl.students : "Teacher: " + cl.teacher;
+                    content += `<div class="class-box"><b>${cl.subject}</b><br>${label}<br>${cl.start_time}-${cl.end_time}</div>`;
+                }
+            });
+            const tempCell = document.createElement("div");
+            tempCell.className = "cell";
+            tempCell.innerHTML = content;
+            html += tempCell.outerHTML;
+        });
+    }
+
+    html += '</div>';
+    html += '</div>'; // Close print-timetable-wrapper
+    return html;
+}
+
+printBtn.onclick = async () => {
+    printViewContainer.innerHTML = ""; 
+    const type = printViewType.value;
+    const jobType = type;
+    
+    // Determine the array of selectors to use based on view type
+    // Teachers use 4, Students now use up to 6
+    const selectorsToUse = type === 'teacher' ? printSelectors.slice(0, 4) : printSelectors; 
+
+    // Define the people to print
+    const printJobs = selectorsToUse.map(s => {
+        return { 
+            id: s.el.value, 
+            name: s.el.options[s.el.selectedIndex]?.text, 
+            type: jobType 
+        };
+    }).filter(job => job.id && !job.name.startsWith("Select ") && job.name !== "No People");
+
+    if (printJobs.length === 0) {
+        alert("Please select at least one " + (type === 'teacher' ? 'Teacher' : 'Student') + " to print.");
+        return;
+    }
+    
+    // Set the layout and job count data attributes for CSS media query targeting
+    let printLayoutAttribute = jobType === 'teacher' ? 'horizontal-teacher' : 'vertical-student';
+    printViewContainer.setAttribute('data-layout', printLayoutAttribute);
+    
+    // Set the job count to target specific CSS for fitting 3 per page (or 4, 5, 6 etc.)
+    printViewContainer.setAttribute('data-job-count', printJobs.length); 
+
+    // Fetch and generate HTML for all selected tables concurrently
+    const gridPromises = printJobs.map(job => generateGridHTML(job.id, job.type, job.name));
+    const gridsHTML = await Promise.all(gridPromises);
+
+    // Insert the generated HTML into the hidden print container
+    gridsHTML.forEach(html => {
+        if (html) printViewContainer.innerHTML += html;
+    });
+
+    // Trigger the native browser print dialog
+    window.print();
+};
+
+loadPeople();
+</script>
+</body>
+</html>
